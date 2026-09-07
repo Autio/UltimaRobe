@@ -14,7 +14,7 @@ jobs:
       - run: python -m pytest tests -q
         working-directory: spritefy
       - run: python scripts/configure.py && docker compose -f compose.json config --quiet
-      - run: python -m unittest discover -s scripts -p test_doctor.py
+      - run: python -m unittest discover -s scripts -p 'test_*.py'
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -28,6 +28,6 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - run: npx vitest run tests/body-measurements.test.ts tests/outfit-quests.test.ts tests/inventory.test.ts tests/garment-details.test.ts tests/garment-bonuses.test.ts tests/renderer-availability.test.tsx
+      - run: npx vitest run tests/body-measurements.test.ts tests/outfit-quests.test.ts tests/inventory.test.ts tests/garment-details.test.ts tests/garment-bonuses.test.ts tests/renderer-availability.test.tsx tests/sprite-review.test.tsx
       - run: npx tsc --noEmit
       - run: npm run build

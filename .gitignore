@@ -12,3 +12,7 @@ data/
 uploads/
 *.sqlite*
 *.log
+private/
+compose.local.json
+backups/
+.backup.lock

@@ -25,7 +25,7 @@ def validate(values):
             errors.append(f'{key}: enter an HTTP(S) URL without credentials, query, or fragment.')
         elif url.hostname.endswith('example.com'):
             errors.append(f'{key}: replace the example address.')
-        elif url.scheme != 'https' and url.hostname not in ('localhost', '127.0.0.1', '::1'):
+        elif url.scheme != 'https' and url.hostname not in ('localhost', '127.0.0.1', '::1') and not url.hostname.endswith('.localhost'):
             errors.append(f'{key}: use HTTPS outside localhost.')
         elif key == 'APP_URL' and url.path not in ('', '/'):
             errors.append('APP_URL: use an origin without a path.')
@@ -73,7 +73,8 @@ def main():
             print('FAIL: OIDC discovery is unavailable or does not match the configured issuer.')
             return 1
     if not args.config_only:
-        for command in (['docker', 'info'], ['docker', 'compose', '-f', 'compose.json', 'config', '--quiet']):
+        compose='compose.local.json' if values.get('BUNDLED_LOGIN')=='true' else 'compose.json'
+        for command in (['docker', 'info'], ['docker', 'compose', '-f', compose, 'config', '--quiet']):
             try:
                 result = subprocess.run(command, cwd=ROOT, capture_output=True, timeout=30)
             except (OSError, subprocess.TimeoutExpired):

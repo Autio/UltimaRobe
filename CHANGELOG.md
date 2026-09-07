@@ -1,5 +1,17 @@
 # Release notes
 
+## 0.3.0-beta.1
+
+- Guided local setup with bundled Dex login and a shared gateway; existing external OIDC setups remain supported.
+- Per-avatar shoulder, waist, wrist, knee, ankle, and width calibration that transforms clothing without modifying the avatar image.
+- Regeneration candidates preserve the accepted sprite until explicitly accepted; candidates can be dismissed.
+- Garment detail presets guide both sprite generation and realistic estimates.
+- Private installation backup/restore, including bundled identities, clothing, outfits, avatars, calibration, and sprite selections.
+- Clear slot-replacement announcements, labeled inspect controls, keyboard focus styling, touch controls, and regeneration-review badges.
+- Browser login and outfit checks, calibration/review API checks, and restoration into fresh services.
+
+Bundled setup is local-only and creates one account. Remote HTTPS hosting still uses external OIDC configuration. Realistic image rendering remains experimental. Browser-local preferences are not part of server backups.
+
 ## 0.2.0-beta.1
 
 - Added a setup doctor and one-command startup with configuration, OIDC discovery, and readiness checks.

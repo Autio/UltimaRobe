@@ -4,7 +4,7 @@
 
 UltimaRobe turns clothing photos into a pixel-art wardrobe: drag a shirt, trousers, or shoes onto your character, build an outfit, and optionally generate a realistic preview with local AI.
 
-This is **UltimaRobe 0.2 beta**, built on [Anyesh/Wardrowbe](https://github.com/Anyesh/wardrowbe). The core wardrobe has an automated clean-install integration suite. It is a standalone source derivative, not an official Wardrowbe release. Inspired by classic RPG inventory screens; not affiliated with Ultima, Baldur's Gate, or their publishers.
+This is **UltimaRobe 0.3 beta**, built on [Anyesh/Wardrowbe](https://github.com/Anyesh/wardrowbe). It includes bundled login, adjustable avatar fitting, reviewable sprite regeneration, and backup/restore tools. It is a standalone source derivative, not an official Wardrowbe release. Inspired by classic RPG inventory screens; not affiliated with Ultima, Baldur's Gate, or their publishers.
 
 <p><img src="spritefy/spritefy/assets/default-masculine.png" width="220" alt="Default masculine pixel avatar"> <img src="spritefy/spritefy/assets/default-feminine.png" width="220" alt="Default feminine pixel avatar"></p>
 
@@ -23,7 +23,11 @@ Your photos and generated sprites belong in your own installation. No personal w
 
 ## Run it
 
-Prerequisites: Docker with Compose, an OIDC identity provider, and Python 3 to create configuration. Linux containers are required; Windows users can use Docker Desktop with WSL2.
+Prerequisites: Docker with Compose and Python 3. Linux containers are required; Windows users can use Docker Desktop with WSL2.
+
+**New local installation:** run `python scripts/setup.py`, then `python scripts/start.py`, and open **http://ultimarobe.localhost:3000**. No separate identity provider is needed. See the [guided setup instructions](docs/SETUP.md).
+
+**Existing identity provider / remote hosting:**
 
 1. Clone this repository and run `python scripts/configure.py`. This creates a private `.env` with random secrets and refuses to overwrite an existing file.
 2. Edit `.env`: set your public app URL and OIDC issuer, client ID, and client secret. Register `<APP_URL>/api/auth/callback/oidc` as the OIDC redirect URI. The issuer must be reachable by both the browser and containers and supply email/profile claims.
@@ -32,7 +36,7 @@ Prerequisites: Docker with Compose, an OIDC identity provider, and Python 3 to c
 
 The web port binds to **127.0.0.1:3000**. Use a TLS reverse proxy for access from other machines. The database, sprite API, renderer, and workers are not published on host ports. Production login is required; development authentication is disabled.
 
-The core stack is tested with fresh databases, signed OIDC test identities, clothing uploads, saved outfits, real sprite jobs, account isolation, and container recreation. Setup still requires an OIDC provider: this beta is aimed at self-hosters comfortable with Docker. Browser login against your chosen identity provider and GPU rendering remain environment-specific checks. See [validation details](docs/VALIDATION.md).
+The core stack is tested with fresh databases, signed OIDC identities, clothing uploads, saved outfits, real sprite jobs, account isolation, and container recreation. Bundled Dex login is tested in a real browser. Setup is still aimed at self-hosters comfortable with Docker. External identity providers and GPU rendering remain environment-specific checks. See [validation details](docs/VALIDATION.md).
 
 ## Local AI
 
@@ -44,6 +48,6 @@ Sprite background removal can download U2Net weights on first use. Outbound down
 
 ## Development and data
 
-See [development and operations](docs/DEVELOPMENT.md), [credits](NOTICE.md), and the [release notes](CHANGELOG.md). Keep named Docker volumes when upgrading; they contain your database, clothes, avatar choices, sprites, and renders. Back up both PostgreSQL and the data volumes before upgrades. Some display preferences and comparison pins live in browser storage.
+See [development and operations](docs/DEVELOPMENT.md), [backup and restore](docs/BACKUPS.md), [credits](NOTICE.md), and the [release notes](CHANGELOG.md). Keep named Docker volumes when upgrading. Run `python scripts/backup.py create backups/wardrobe.zip` before upgrades; some display preferences and comparison pins live only in browser storage.
 
 Code is provided under the [MIT license](LICENSE), retaining the upstream copyright notice. Dependencies and AI models retain their own licenses.

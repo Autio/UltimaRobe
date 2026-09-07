@@ -17,6 +17,8 @@ from spritefy.segmenter import segment_garment
 from spritefy.pixel_forge import forge_pixel_sprite
 from spritefy.placement import place_layer
 from spritefy.default_fit import fit_default
+from spritefy.calibration import warp
+from pydantic import model_validator
 
 ROOT=Path(os.environ.get('SPRITEFY_DATA','/opt/spritefy/data'))
 ROOT.mkdir(parents=True,exist_ok=True)
@@ -57,7 +59,7 @@ def save_details(req:ItemDetails):
     with submit_lock:
         data=item_details(req.owner)
         if req.item_id not in data and len(data)>=2000: raise HTTPException(400,'Too many customized garments')
-        data[req.item_id]=req.model_dump(exclude={'owner','item_id'})
+        data[req.item_id]={**data.get(req.item_id,{}),**req.model_dump(exclude={'owner','item_id'})}
         folder=ROOT/'details';folder.mkdir(exist_ok=True)
         path=folder/(owner_key(req.owner)+'.json');temp=path.with_suffix('.tmp')
         temp.write_text(json.dumps(data));temp.replace(path)
@@ -95,7 +97,35 @@ def list_jobs(owner:str):
     latest={}
     for job in queue.list_jobs(owner,1000):
         if job['item_id'] not in latest: latest[job['item_id']]=public(job)
-    return list(latest.values())
+    details=item_details(owner)
+    result=[]
+    for item,job in latest.items():
+        saved=details.get(item,{})
+        accepted=queue.get_job(saved.get('accepted_job','')) if saved.get('accepted_job') else None
+        if accepted and accepted['owner']==owner and accepted['item_id']==item and accepted['status']=='complete':
+            chosen=public(accepted)
+            if job['job_id'] not in (accepted['job_id'],saved.get('dismissed_job')):chosen['candidate']=job
+            result.append(chosen)
+        else:result.append(job)
+    return result
+
+class SpriteSelection(BaseModel):
+    owner:str=Field(min_length=1,max_length=200)
+    item_id:str
+    job_id:str
+    dismiss:bool=False
+
+@app.post('/api/v1/jobs/select')
+def select_sprite(req:SpriteSelection):
+    job=owned(req.job_id,req.owner)
+    if job['item_id']!=req.item_id:raise HTTPException(400,'Sprite belongs to a different garment')
+    if not req.dismiss and job['status']!='complete':raise HTTPException(409,'Wait for this sprite to finish')
+    with submit_lock:
+        data=item_details(req.owner);detail=data.setdefault(req.item_id,{})
+        detail['dismissed_job' if req.dismiss else 'accepted_job']=req.job_id
+        folder=ROOT/'details';folder.mkdir(exist_ok=True)
+        path=folder/(owner_key(req.owner)+'.json');temp=path.with_suffix('.tmp');temp.write_text(json.dumps(data));temp.replace(path)
+    return {'status':'saved'}
 
 @app.post('/api/v1/jobs',status_code=202)
 def create_job(file:UploadFile=File(...),item_id:str=Form(...),owner:str=Form(...),user_hint:str=Form('{}'),force:bool=Form(False)):
@@ -111,6 +141,11 @@ def create_job(file:UploadFile=File(...),item_id:str=Form(...),owner:str=Form(..
         if previous and not force and previous['status']=='complete' and previous.get('user_hint')==hint and (previous.get('metadata') or {}).get('version')==VERSION: return public(previous)
         active=[j for j in queue.list_jobs(None,1000) if j['status'] not in ('complete','failed')]
         if len(active)>=24: raise HTTPException(429,'Sprite queue is full; try shortly')
+        if previous and previous['status']=='complete':
+            data=item_details(owner);detail=data.setdefault(item_id,{})
+            detail.setdefault('accepted_job',previous['job_id'])
+            folder=ROOT/'details';folder.mkdir(exist_ok=True)
+            path=folder/(owner_key(owner)+'.json');temp=path.with_suffix('.tmp');temp.write_text(json.dumps(data));temp.replace(path)
         return public(queue.get_job(queue.enqueue(item_id,im,owner,hint)))
 
 @app.get('/api/v1/jobs/{job_id}')
@@ -128,17 +163,58 @@ def avatar_settings(owner):
     key=owner_key(owner)
     personal=(ROOT/'avatars'/(key+'.png')).exists()
     choice='personal' if personal else 'masculine'
+    saved={}
     try:
         saved=json.loads((ROOT/'avatars'/(key+'-settings.json')).read_text())
         if saved.get('choice') in ('masculine','feminine','personal'): choice=saved['choice']
     except (OSError,ValueError): pass
     if choice=='personal' and not personal: choice='masculine'
-    return {'choice':choice,'has_personal':personal}
+    calibration=saved.get('calibrations',{}).get(choice)
+    return {'choice':choice,'has_personal':personal,'calibration':calibration,'default_calibration':default_calibration(choice)}
+
+def default_calibration(choice):
+    if choice=='personal':return {'anchors':[58,125,152,195,244],'width':76}
+    from spritefy.default_fit import geometry
+    alpha,anchors=geometry(choice)
+    import numpy as np
+    xs=np.where(alpha[anchors[2]:anchors[4]]>128)[1]
+    return {'anchors':anchors[2:7],'width':int(xs.max()-xs.min())}
 
 def save_avatar_choice(owner,choice):
     folder=ROOT/'avatars';folder.mkdir(exist_ok=True)
     path=folder/(owner_key(owner)+'-settings.json')
-    temp=path.with_suffix('.tmp');temp.write_text(json.dumps({'choice':choice}));temp.replace(path)
+    with submit_lock:
+        try:saved=json.loads(path.read_text())
+        except (ValueError,OSError):saved={}
+        saved['choice']=choice
+        temp=path.with_suffix('.tmp');temp.write_text(json.dumps(saved));temp.replace(path)
+
+class Calibration(BaseModel):
+    anchors:list[int]=Field(min_length=5,max_length=5)
+    width:int=Field(ge=32,le=160)
+    @model_validator(mode='after')
+    def validate_anchors(self):
+        if not 20<=self.anchors[0] or not self.anchors[-1]<=270 or any(b-a<8 for a,b in zip(self.anchors,self.anchors[1:])):
+            raise ValueError('Landmarks must be ordered, at least eight pixels apart, between 20 and 270.')
+        return self
+
+class CalibrationRequest(BaseModel):
+    owner:str=Field(min_length=1,max_length=200)
+    choice:AvatarChoice
+    calibration:Calibration|None=None
+
+@app.post('/api/v1/avatar/calibration')
+def save_calibration(req:CalibrationRequest):
+    folder=ROOT/'avatars';folder.mkdir(exist_ok=True)
+    path=folder/(owner_key(req.owner)+'-settings.json')
+    with submit_lock:
+        try:saved=json.loads(path.read_text())
+        except (ValueError,OSError):saved={}
+        calibrations=saved.setdefault('calibrations',{})
+        if req.calibration:calibrations[req.choice]=req.calibration.model_dump()
+        else:calibrations.pop(req.choice,None)
+        temp=path.with_suffix('.tmp');temp.write_text(json.dumps(saved));temp.replace(path)
+    return avatar_settings(req.owner)
 
 def base(owner):
     choice=avatar_settings(owner)['choice']
@@ -185,11 +261,14 @@ class Composite(BaseModel):
     tucked:bool=False
     scale:int=Field(default=1,ge=1,le=4)
     preview_placement:Placement|None=None
+    preview_calibration:Calibration|None=None
 
 @app.post('/api/v1/paperdoll/composite')
 def composite(req:Composite):
     layers={}
-    avatar_choice=avatar_settings(req.owner)['choice']
+    settings=avatar_settings(req.owner)
+    avatar_choice=settings['choice']
+    calibration=req.preview_calibration.model_dump() if req.preview_calibration else settings['calibration']
     details=item_details(req.owner)
     for jid in req.equipped_job_ids:
         job=owned(jid,req.owner)
@@ -200,7 +279,10 @@ def composite(req:Composite):
         adjustment=details.get(job['item_id'],{}).get('placement',{})
         if req.preview_placement is not None and len(req.equipped_job_ids)==1: adjustment=req.preview_placement.model_dump()
         if slot not in ('top','outer'): adjustment={**adjustment,'sleeve':100}
-        with Image.open(job['paperdoll_sprite']) as im: layers[slot]=place_layer(fit_default(im.convert('RGBA'),avatar_choice),adjustment)
+        with Image.open(job['paperdoll_sprite']) as im:
+            layer=fit_default(im.convert('RGBA'),avatar_choice)
+            if calibration:layer=warp(layer,settings['default_calibration'],calibration)
+            layers[slot]=place_layer(layer,adjustment)
     result=base(req.owner)
     order=['socks','feet','bottom','top','mid','outer','belt','neck','head','bag','extra']
     if req.tucked: order=['top','socks','feet','bottom','mid','outer','belt','neck','head','bag','extra']

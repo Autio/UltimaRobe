@@ -7,3 +7,5 @@ The source baseline immediately before the local inventory work was commit `0917
 The Spritefy engine, inventory interface additions, and realistic-render bridge were developed for UltimaRobe with AI coding assistance. The bundled masculine and feminine default avatar PNGs were generated for this project with AI. No user-uploaded likeness, clothing photo, game screenshot, game sprite, or model weights are bundled. The release uses a mathematically generated RGB/grayscale palette rather than the prototype's extracted reference palette.
 
 Ultima and Baldur's Gate are referenced only to describe design inspiration. This project is independent of their creators and publishers. Third-party dependencies and separately downloaded models are covered by their respective licenses, not by this repository's MIT license.
+
+Optional bundled login runs the separately distributed Dex container (https://github.com/dexidp/dex) and an nginx gateway. Browser integration tests use Playwright. Those projects retain their own licenses and are not vendored into this repository.

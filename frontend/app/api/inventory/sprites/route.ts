@@ -34,13 +34,14 @@ export async function POST(req:NextRequest){
    return await forward('/api/v1/avatar',{method:'POST',body:data});
   }
   const body=await req.json();
+  if(body.action==='avatar-calibration')return await forward('/api/v1/avatar/calibration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,choice:body.choice,calibration:body.calibration})});
   if(body.action==='avatar-select'){
    if(!['masculine','feminine','personal'].includes(body.choice))return NextResponse.json({error:'Invalid avatar choice'},{status:400});
    return await forward('/api/v1/avatar/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,choice:body.choice})});
   }
   if(body.action==='composite'){
    if(!Array.isArray(body.jobs)||body.jobs.length>11||body.jobs.some((v:unknown)=>typeof v!=='string'||!/^[a-f0-9]{32}$/.test(v)))return NextResponse.json({error:'Invalid equipped sprites'},{status:400});
-   return await forward('/api/v1/paperdoll/composite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,equipped_job_ids:body.jobs,tucked:body.tucked===true,scale:2,preview_placement:body.previewPlacement})});
+   return await forward('/api/v1/paperdoll/composite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,equipped_job_ids:body.jobs,tucked:body.tucked===true,scale:2,preview_placement:body.previewPlacement,preview_calibration:body.previewCalibration})});
   }
   if(typeof body.id!=='string'||!/^[a-f0-9-]{36}$/i.test(body.id))return NextResponse.json({error:'Invalid garment'},{status:400});
   const backend=process.env.BACKEND_URL||'http://backend:8000';
@@ -48,6 +49,10 @@ export async function POST(req:NextRequest){
   if(!response.ok)return NextResponse.json({error:'Garment unavailable'},{status:404});
   const item=await response.json() as Item;
   if(item.is_archived)return NextResponse.json({error:'Garment archived'},{status:400});
+  if(body.action==='sprite-select'){
+   if(typeof body.jobId!=='string'||!/^[a-f0-9]{32}$/.test(body.jobId))return NextResponse.json({error:'Invalid sprite'},{status:400});
+   return await forward('/api/v1/jobs/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,item_id:item.id,job_id:body.jobId,dismiss:body.dismiss===true})});
+  }
   if(body.action==='details-save')return await forward('/api/v1/details',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:s.user.id,item_id:item.id,placement:body.placement,enchanted_name:body.enchanted_name||'',lore:body.lore||''})});
   const source=item.image_url;
   if(!source?.startsWith('/api/v1/images/')||source.includes('..'))throw new Error('Invalid source');

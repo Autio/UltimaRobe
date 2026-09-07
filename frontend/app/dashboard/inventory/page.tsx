@@ -51,7 +51,7 @@ export default function InventoryPage(){
  const inspected=items.find(i=>i.id===inspectedId);
  const bonuses=outfitBonuses(selected);
  const missing=wardrobe.isSuccess?ids.filter(id=>!items.some(i=>i.id===id)).length:0;
- function select(item:Item){if(!ids.includes(item.id)&&!sprites.jobs[item.id])void sprites.generate(item);setIds(equip(selected,item).map(i=>i.id));setNotice(`${garmentLabel(item)} ${ids.includes(item.id)?'removed':'equipped'}.`);}
+ function select(item:Item){const removed=ids.includes(item.id);const replaced=selected.find(i=>i.id!==item.id&&slotFor(i)===slotFor(item));if(!removed&&!sprites.jobs[item.id])void sprites.generate(item);setIds(equip(selected,item).map(i=>i.id));setNotice(removed?`${garmentLabel(item)} removed.`:replaced?`${garmentLabel(item)} equipped, replacing ${garmentLabel(replaced)}.`:`${garmentLabel(item)} equipped.`);}
  async function saveLook(){try{await save.mutateAsync({items:selected.map(i=>i.id),name:name.trim(),occasion,scheduled_for:null,mark_worn:false});setNotice(`“${name.trim()}” saved to your looks.`);await looks.refetch();}catch(e){setNotice(getErrorMessage(e,'Could not save your outfit.'));}}
  return <div className={`ur-inventory ur-theme-${theme}`}>
   <header className="ur-heading"><div><span className="ur-eyebrow">THE EVERYDAY ADVENTURER</span><h1>UltimaRobe</h1><p>Your wardrobe. A different kind of character sheet.</p></div><Link href="/dashboard/wardrobe" className="ur-link">＋ Add clothing</Link></header>
@@ -78,15 +78,15 @@ export default function InventoryPage(){
     {wardrobe.isError&&<div className="ur-empty" role="alert">Couldn’t load your clothing. <button onClick={()=>wardrobe.refetch()}>Try again</button></div>}
     <div className={`ur-grid ur-grid-${density}`}>{visible.map(i=>{
       const job=sprites.jobs[i.id];
-      const isGen=job&&!['complete','failed'].includes(job.status);
+      const isGen=(job&&!['complete','failed'].includes(job.status))||(job?.candidate&&!['complete','failed'].includes(job.candidate.status));
       return <EnchantedTooltip key={i.id} item={i} detail={custom.details[i.id]} enabled={showBonuses} theme={theme}><div onMouseEnter={()=>{if(showBonuses)setInspectedId(i.id);}} onFocus={()=>{if(showBonuses)setInspectedId(i.id);}} title={showBonuses?undefined:`${garmentLabel(i)} · ${SLOT_LABEL[slotFor(i)]} · ${i.tags?.material||''} ${i.tags?.fit||''}`} aria-label={`${garmentLabel(i)}, ${SLOT_LABEL[slotFor(i)]}`} className={`ur-item ${ids.includes(i.id)?'equipped':''}`}>
         <div className="ur-item-image" role="button" tabIndex={0} aria-label={`Equip ${garmentLabel(i)}`} aria-pressed={ids.includes(i.id)} onKeyDown={e=>{if(e.target!==e.currentTarget)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();select(i);}}} onClick={()=>select(i)} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',i.id)}>
           <img className={job?.status==='complete'?'ur-pixel-icon':''} src={job?.status==='complete'?`/api/inventory/sprites?id=${job.job_id}&kind=inventory&t=${job.updated_at||''}`:i.thumbnail_url||i.image_url} alt="" loading="lazy"/>
-          {ids.includes(i.id)&&<span className="ur-check">✓</span>}
+          {ids.includes(i.id)&&<span className="ur-check">✓</span>}{job?.candidate?.status==='complete'&&<button className="ur-review-badge" onClick={e=>{e.stopPropagation();setTuningItem(i);}}>Review new sprite</button>}
           <div className="ur-item-actions">
             {showBonuses&&<button type="button" className="ur-item-action-btn" aria-label={`Inspect enchantments for ${garmentLabel(i)}`} onClick={e=>{e.stopPropagation();setInspectedId(i.id);}}>✦</button>}
-            <button type="button" className="ur-item-action-btn" title="Tune & inspect sprite" onClick={(e)=>{e.stopPropagation();setTuningItem(i);}}>⚙</button>
-            <button type="button" className={`ur-item-action-btn ${isGen?'spinning':''}`} title={isGen?'Generating sprite…':'Regenerate sprite'} disabled={isGen} onClick={(e)=>{e.stopPropagation();void sprites.generate(i,true);}}>↻</button>
+            <button type="button" className="ur-item-action-btn" aria-label={`Inspect and tune ${garmentLabel(i)}`} title="Tune & inspect sprite" onClick={(e)=>{e.stopPropagation();setTuningItem(i);}}>⚙</button>
+            <button type="button" className={`ur-item-action-btn ${isGen?'spinning':''}`} aria-label={`Regenerate ${garmentLabel(i)}`} title={isGen?'Generating sprite…':'Regenerate sprite'} disabled={isGen} onClick={(e)=>{e.stopPropagation();void sprites.generate(i,true);}}>↻</button>
           </div>
         </div>
         <button type="button" className="ur-item-body" onClick={()=>select(i)}>

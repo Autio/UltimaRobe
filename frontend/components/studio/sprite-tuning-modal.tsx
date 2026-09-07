@@ -1,4 +1,5 @@
 'use client';
+import {SpriteReview} from './sprite-review';
 /* eslint-disable @next/next/no-img-element */
 import React, { useState, useEffect } from 'react';
 import {LoreEditor} from './enchanted-item';
@@ -57,7 +58,7 @@ export function SpriteTuningModal({
   if (!item) return null;
 
   const slot = slotFor(item);
-  const isGenerating = busy || (job && !['complete', 'failed'].includes(job.status));
+  const isGenerating = busy || (job && !['complete', 'failed'].includes(job.status)) || (job?.candidate&&!['complete','failed'].includes(job.candidate.status));
 
   async function handleRegen() {
     if (!item || isGenerating) return;
@@ -90,6 +91,7 @@ export function SpriteTuningModal({
         <div className="ur-modal-body">
           {/* Left Column: Visual Previews */}
           <div className="ur-modal-previews">
+            <SpriteReview job={job}/>
             <div className="ur-modal-preview-card">
               <span>Original Photograph</span>
               <img
@@ -197,10 +199,13 @@ export function SpriteTuningModal({
               Cut &amp; Silhouette Styling Notes
               <textarea
                 value={cutDetails}
+                maxLength={400}
                 placeholder="e.g. contrasting collar, patch pockets, hip-length hem, oversized fit"
                 onChange={(e) => setCutDetails(e.target.value)}
               />
             </label>
+
+            <fieldset className="ur-preserve-details"><legend>Details to preserve</legend><p>These notes guide both the sprite and realistic estimate.</p>{(slot==='bottom'?['flared legs','high waist','wide legs','cropped hem','preserve fabric pattern']:['short sleeves','long sleeves','contrasting collar','untucked hem','preserve fabric pattern']).map(note=><button type="button" key={note} aria-pressed={cutDetails.toLowerCase().includes(note)} onClick={()=>setCutDetails(old=>old.toLowerCase().includes(note)?old:([old.trim(),note].filter(Boolean).join(', ').slice(0,400)))}>{note}</button>)}</fieldset>
 
             <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
               <p style={{ fontSize: '11px', color: '#a89f89', lineHeight: '1.5' }}>
