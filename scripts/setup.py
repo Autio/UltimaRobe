@@ -32,14 +32,17 @@ def configure_local(root,email,password_hash):
     (private/'gateway.conf').write_text('''server {
  listen 3000;
  server_name _;
+ resolver 127.0.0.11 valid=10s ipv6=off;
  client_max_body_size 30m;
  location /identity/ {
-  proxy_pass http://login:5556;
+  set $login_upstream http://login:5556;
+  proxy_pass $login_upstream;
   proxy_set_header Host $http_host;
   proxy_set_header X-Forwarded-Proto $scheme;
  }
  location / {
-  proxy_pass http://frontend:3000;
+  set $frontend_upstream http://frontend:3000;
+  proxy_pass $frontend_upstream;
   proxy_set_header Host $http_host;
   proxy_set_header X-Forwarded-Proto $scheme;
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
