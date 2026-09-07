@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,7 +42,7 @@ async def capabilities() -> dict[str, Any]:
 
 
 @router.get("/health/ready")
-async def readiness_check(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def readiness_check(response: Response, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     checks = {
         "database": "unhealthy",
     }
@@ -50,10 +50,12 @@ async def readiness_check(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     try:
         await db.execute(text("SELECT 1"))
         checks["database"] = "healthy"
-    except Exception as e:
-        checks["database"] = f"unhealthy: {str(e)}"
+    except Exception:
+        checks["database"] = "unhealthy"
 
     overall = "healthy" if all(v == "healthy" for v in checks.values()) else "unhealthy"
+    if overall != "healthy":
+        response.status_code = 503
 
     return {
         "status": overall,

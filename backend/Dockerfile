@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt requirements-extras.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-extras.txt
 
-# Pre-download rembg model so first request is instant
-RUN python -c "from rembg import new_session; new_session()"
+# Model weights are fetched on first use, not implicitly baked into every
+# API/worker image. The selected model is configured by BG_REMOVAL_MODEL.
 
 # Copy application code
 COPY . .
@@ -27,7 +27,7 @@ RUN mkdir -p /data/wardrobe /data/uploads && chown -R appuser:appuser /data
 # Entrypoint drops to appuser (remapped to PUID/PGID when set); when the
 # container is started as a non-root uid (e.g. k8s runAsUser) it execs directly
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Expose port

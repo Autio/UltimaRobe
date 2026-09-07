@@ -58,6 +58,11 @@ export async function POST(req:NextRequest){
 export async function GET(req:NextRequest){
  const session=await getServerSession(authOptions);
  if(!session?.accessToken||!session.user?.id)return NextResponse.json({error:'Please sign in.'},{status:401});
+ if(req.nextUrl.searchParams.get('status')==='1'){
+  let available=false;
+  if(renderUrl())try{const result=await fetch(`${renderUrl()}/health`,{headers:headers(),cache:'no-store',signal:AbortSignal.timeout(3000)});available=result.ok;}catch{}
+  return NextResponse.json({available},{headers:{'Cache-Control':'private, no-store'}});
+ }
  if(!renderUrl())return NextResponse.json({error:'Renderer unavailable.'},{status:503});
  const id=req.nextUrl.searchParams.get('id');
  if(!id||!/^[a-f0-9]{32}$/.test(id))return NextResponse.json({error:'Invalid render.'},{status:400});

@@ -12,6 +12,10 @@ The browser talks to the authenticated Next.js bridge. Spritefy and the renderer
 
 ## Checks
 
+Installation doctor: `python -m unittest discover -s scripts -p test_doctor.py`.
+
+Full core integration: `python scripts/integration_check.py`. This builds a separate stack with fresh named volumes and a random project name, uses temporary signed OIDC fixtures, and removes only that disposable project's volumes afterward. It requires Docker and several GB of free disk; it does not copy your `.env` or data. This checks API identity validation, not an interactive browser login against a real identity provider.
+
 Frontend: `cd frontend`, `npm ci`, `npm test`, `npx tsc --noEmit`, `npm run build`.
 
 Sprite geometry: install `spritefy/requirements.txt` and `pytest`; from `spritefy/`, run `python -m pytest tests`. Runtime is Linux because the AI scheduler uses `fcntl`. Geometry tests also run on Windows.
