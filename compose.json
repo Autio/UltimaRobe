@@ -1,0 +1,279 @@
+{
+  "name": "ultimarobe",
+  "services": {
+    "postgres": {
+      "image": "postgres:15-alpine",
+      "environment": {
+        "POSTGRES_DB": "wardrobe",
+        "POSTGRES_USER": "wardrobe",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:?Run scripts/configure.py}"
+      },
+      "volumes": [
+        "postgres_data:/var/lib/postgresql/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U wardrobe"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 20
+      },
+      "restart": "unless-stopped"
+    },
+    "redis": {
+      "image": "redis:7-alpine",
+      "volumes": [
+        "redis_data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 20
+      },
+      "restart": "unless-stopped"
+    },
+    "migrate": {
+      "build": "./backend",
+      "environment": {
+        "DATABASE_URL": "postgresql+asyncpg://wardrobe:${POSTGRES_PASSWORD:?Run scripts/configure.py}@postgres:5432/wardrobe",
+        "REDIS_URL": "redis://redis:6379/0",
+        "SECRET_KEY": "${SECRET_KEY:?Run scripts/configure.py}",
+        "STORAGE_PATH": "/data/wardrobe",
+        "DEBUG": "false",
+        "AUTH_TRUST_HEADER": "false",
+        "OIDC_ISSUER_URL": "${OIDC_ISSUER_URL:?Configure OIDC}",
+        "OIDC_CLIENT_ID": "${OIDC_CLIENT_ID:?Configure OIDC}",
+        "OIDC_CLIENT_SECRET": "${OIDC_CLIENT_SECRET:?Configure OIDC}",
+        "CORS_ORIGINS": "[\"${APP_URL:-http://localhost:3000}\"]",
+        "AI_INTERNAL_ENABLED": "${AI_INTERNAL_ENABLED:-false}",
+        "AI_BASE_URL": "${AI_BASE_URL:-http://host.docker.internal:11434/v1}",
+        "AI_VISION_MODEL": "${AI_VISION_MODEL:-}",
+        "AI_TEXT_MODEL": "${AI_TEXT_MODEL:-}"
+      },
+      "command": [
+        "alembic",
+        "upgrade",
+        "head"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "backend": {
+      "build": "./backend",
+      "environment": {
+        "DATABASE_URL": "postgresql+asyncpg://wardrobe:${POSTGRES_PASSWORD:?Run scripts/configure.py}@postgres:5432/wardrobe",
+        "REDIS_URL": "redis://redis:6379/0",
+        "SECRET_KEY": "${SECRET_KEY:?Run scripts/configure.py}",
+        "STORAGE_PATH": "/data/wardrobe",
+        "DEBUG": "false",
+        "AUTH_TRUST_HEADER": "false",
+        "OIDC_ISSUER_URL": "${OIDC_ISSUER_URL:?Configure OIDC}",
+        "OIDC_CLIENT_ID": "${OIDC_CLIENT_ID:?Configure OIDC}",
+        "OIDC_CLIENT_SECRET": "${OIDC_CLIENT_SECRET:?Configure OIDC}",
+        "CORS_ORIGINS": "[\"${APP_URL:-http://localhost:3000}\"]",
+        "AI_INTERNAL_ENABLED": "${AI_INTERNAL_ENABLED:-false}",
+        "AI_BASE_URL": "${AI_BASE_URL:-http://host.docker.internal:11434/v1}",
+        "AI_VISION_MODEL": "${AI_VISION_MODEL:-}",
+        "AI_TEXT_MODEL": "${AI_TEXT_MODEL:-}"
+      },
+      "volumes": [
+        "wardrobe_data:/data/wardrobe"
+      ],
+      "extra_hosts": [
+        "host.docker.internal:host-gateway"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "worker": {
+      "build": "./backend",
+      "environment": {
+        "DATABASE_URL": "postgresql+asyncpg://wardrobe:${POSTGRES_PASSWORD:?Run scripts/configure.py}@postgres:5432/wardrobe",
+        "REDIS_URL": "redis://redis:6379/0",
+        "SECRET_KEY": "${SECRET_KEY:?Run scripts/configure.py}",
+        "STORAGE_PATH": "/data/wardrobe",
+        "DEBUG": "false",
+        "AUTH_TRUST_HEADER": "false",
+        "OIDC_ISSUER_URL": "${OIDC_ISSUER_URL:?Configure OIDC}",
+        "OIDC_CLIENT_ID": "${OIDC_CLIENT_ID:?Configure OIDC}",
+        "OIDC_CLIENT_SECRET": "${OIDC_CLIENT_SECRET:?Configure OIDC}",
+        "CORS_ORIGINS": "[\"${APP_URL:-http://localhost:3000}\"]",
+        "AI_INTERNAL_ENABLED": "${AI_INTERNAL_ENABLED:-false}",
+        "AI_BASE_URL": "${AI_BASE_URL:-http://host.docker.internal:11434/v1}",
+        "AI_VISION_MODEL": "${AI_VISION_MODEL:-}",
+        "AI_TEXT_MODEL": "${AI_TEXT_MODEL:-}"
+      },
+      "volumes": [
+        "wardrobe_data:/data/wardrobe"
+      ],
+      "extra_hosts": [
+        "host.docker.internal:host-gateway"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "command": [
+        "arq",
+        "app.workers.worker.WorkerSettings"
+      ]
+    },
+    "image-worker": {
+      "build": "./backend",
+      "environment": {
+        "DATABASE_URL": "postgresql+asyncpg://wardrobe:${POSTGRES_PASSWORD:?Run scripts/configure.py}@postgres:5432/wardrobe",
+        "REDIS_URL": "redis://redis:6379/0",
+        "SECRET_KEY": "${SECRET_KEY:?Run scripts/configure.py}",
+        "STORAGE_PATH": "/data/wardrobe",
+        "DEBUG": "false",
+        "AUTH_TRUST_HEADER": "false",
+        "OIDC_ISSUER_URL": "${OIDC_ISSUER_URL:?Configure OIDC}",
+        "OIDC_CLIENT_ID": "${OIDC_CLIENT_ID:?Configure OIDC}",
+        "OIDC_CLIENT_SECRET": "${OIDC_CLIENT_SECRET:?Configure OIDC}",
+        "CORS_ORIGINS": "[\"${APP_URL:-http://localhost:3000}\"]",
+        "AI_INTERNAL_ENABLED": "${AI_INTERNAL_ENABLED:-false}",
+        "AI_BASE_URL": "${AI_BASE_URL:-http://host.docker.internal:11434/v1}",
+        "AI_VISION_MODEL": "${AI_VISION_MODEL:-}",
+        "AI_TEXT_MODEL": "${AI_TEXT_MODEL:-}"
+      },
+      "volumes": [
+        "wardrobe_data:/data/wardrobe"
+      ],
+      "extra_hosts": [
+        "host.docker.internal:host-gateway"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "command": [
+        "arq",
+        "app.workers.image_worker.ImageWorkerSettings"
+      ]
+    },
+    "frontend": {
+      "build": "./frontend",
+      "ports": [
+        "127.0.0.1:3000:3000"
+      ],
+      "environment": {
+        "BACKEND_URL": "http://backend:8000",
+        "NEXTAUTH_URL": "${APP_URL:-http://localhost:3000}",
+        "NEXTAUTH_SECRET": "${NEXTAUTH_SECRET:?Run scripts/configure.py}",
+        "DEV_MODE": "false",
+        "OIDC_ISSUER_URL": "${OIDC_ISSUER_URL:?Configure OIDC}",
+        "OIDC_CLIENT_ID": "${OIDC_CLIENT_ID:?Configure OIDC}",
+        "OIDC_CLIENT_SECRET": "${OIDC_CLIENT_SECRET:?Configure OIDC}",
+        "SPRITEFY_URL": "http://spritefy:8190",
+        "SPRITEFY_KEY": "${SPRITEFY_KEY:?Run scripts/configure.py}",
+        "IMAGE_RENDER_URL": "http://renderer:8189",
+        "IMAGE_RENDER_KEY": "${IMAGE_RENDER_KEY:?Run scripts/configure.py}"
+      },
+      "depends_on": [
+        "backend",
+        "spritefy"
+      ],
+      "restart": "unless-stopped"
+    },
+    "spritefy": {
+      "build": "./spritefy",
+      "environment": {
+        "SPRITEFY_KEY": "${SPRITEFY_KEY:?Run scripts/configure.py}",
+        "SPRITEFY_DATA": "/data",
+        "OLLAMA_HOST": "${OLLAMA_HOST:-http://host.docker.internal:11434}",
+        "VISION_MODEL": "${VISION_MODEL:-}",
+        "AI_LOCK_PATH": "/shared/ai-work.lock"
+      },
+      "extra_hosts": [
+        "host.docker.internal:host-gateway"
+      ],
+      "volumes": [
+        "sprite_data:/data",
+        "ai_lock:/shared",
+        "segmentation_models:/root/.u2net"
+      ],
+      "restart": "unless-stopped"
+    },
+    "renderer": {
+      "profiles": [
+        "realistic"
+      ],
+      "build": "./renderer",
+      "environment": {
+        "RENDER_KEY": "${IMAGE_RENDER_KEY:?Run scripts/configure.py}",
+        "RENDER_DATA": "/data",
+        "AI_LOCK_PATH": "/shared/ai-work.lock"
+      },
+      "volumes": [
+        "render_data:/data",
+        "model_cache:/models",
+        "ai_lock:/shared"
+      ],
+      "deploy": {
+        "resources": {
+          "reservations": {
+            "devices": [
+              {
+                "driver": "nvidia",
+                "count": 1,
+                "capabilities": [
+                  "gpu"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "restart": "unless-stopped"
+    }
+  },
+  "volumes": {
+    "postgres_data": {},
+    "redis_data": {},
+    "wardrobe_data": {},
+    "sprite_data": {},
+    "ai_lock": {},
+    "segmentation_models": {},
+    "render_data": {},
+    "model_cache": {}
+  }
+}
